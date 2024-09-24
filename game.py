@@ -1,17 +1,20 @@
 # main.py
 
 import pygame
-from solvers import SudokuSolver, backTrackingSolver  # Ensure these solvers are correctly implemented
+from solvers.DLX import SudokuSolver
+from solvers.backtracking import backTrackingSolver
 import time
 
 # Initialize Pygame
 pygame.init()
 
 # Constants
-WIDTH, HEIGHT = 600, 600
+WIDTH, HEIGHT = 600,600
+EXTRA_HEIGHT = 200
 GRID_SIZE = 9
 CELL_SIZE = WIDTH // GRID_SIZE
 FONT = pygame.font.SysFont('Arial', 40)
+SMALL_FONT = pygame.font.SysFont('Arial', 18)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
@@ -20,30 +23,24 @@ LIGHT_BLUE = (173, 216, 230)
 GRAY = (128, 128, 128)
 
 # Screen setup
-screen = pygame.display.set_mode((WIDTH, HEIGHT + 50))  # Extra space for messages
+screen = pygame.display.set_mode((WIDTH, HEIGHT + EXTRA_HEIGHT))  # Extra space for messages and instructions
 pygame.display.set_caption('Sudoku Solver')
 
-# Example initial grid with some fixed cells (0 represents empty cells)
-initial_grid = [
-    [5, 3, 0, 0, 7, 0, 0, 0, 0],
-    [6, 0, 0, 1, 9, 5, 0, 0, 0],
-    [0, 9, 8, 0, 0, 0, 0, 6, 0],
-    [8, 0, 0, 0, 6, 0, 0, 0, 3],
-    [4, 0, 0, 8, 0, 3, 0, 0, 1],
-    [7, 0, 0, 0, 2, 0, 0, 0, 6],
-    [0, 6, 0, 0, 0, 0, 2, 8, 0],
-    [0, 0, 0, 4, 1, 9, 0, 0, 5],
-    [0, 0, 0, 0, 8, 0, 0, 7, 9]
-]
-
 # Initialize grids
-grid = [row[:] for row in initial_grid]
-fixed_grid = [row[:] for row in initial_grid]
+grid = [
+    [0 for _ in range(9)] for _ in range(9)
+]
+fixed_grid = [
+    [0 for _ in range(9)] for _ in range(9)
+]
 error_grid = [[0 for _ in range(9)] for _ in range(9)]
 
 # Message display
-message = ""
+message = "Input mode enabled. Enter your puzzle."
 message_color = BLACK
+
+# Input mode flag
+input_mode = True
 
 # Draw grid function
 def draw_grid():
@@ -68,9 +65,22 @@ def draw_grid():
     draw_numbers()
 
     # Draw message area
-    pygame.draw.rect(screen, GRAY, (0, HEIGHT, WIDTH, 50))
-    msg_text = FONT.render(message, True, message_color)
+    pygame.draw.rect(screen, GRAY, (0, HEIGHT, WIDTH, EXTRA_HEIGHT))
+    msg_text = SMALL_FONT.render(message, True, message_color)
     screen.blit(msg_text, (10, HEIGHT + 10))
+
+    # Display instructions
+    instructions = [
+        "Instructions:",
+        "Click on a cell and press 1-9 to enter a number.",
+        "Press Enter to toggle input mode.",
+        "Press B to solve using Backtracking.",
+        "Press D to solve using DLX.",
+        "Press R to reset the grid."
+    ]
+    for idx, line in enumerate(instructions):
+        instr_text = SMALL_FONT.render(line, True, BLACK)
+        screen.blit(instr_text, (10, HEIGHT + 40 + idx * 20))
 
 # Display numbers in grid
 def draw_numbers():
@@ -90,16 +100,22 @@ def draw_numbers():
 
 # Reset the grid to initial state
 def reset_grid():
-    global grid, error_grid, message, message_color
-    grid = [row[:] for row in initial_grid]
+    global grid, fixed_grid, error_grid, message, message_color, input_mode
+    grid = [
+        [0 for _ in range(9)] for _ in range(9)
+    ]
+    fixed_grid = [
+        [0 for _ in range(9)] for _ in range(9)
+    ]
     error_grid = [[0 for _ in range(9)] for _ in range(9)]
-    message = "Grid Reset"
+    message = "Grid Reset. Input mode enabled."
     message_color = BLACK
+    input_mode = True
 
 # Handle user input for a cell
 def handle_input(row, col, value):
     global message, message_color
-    if fixed_grid[row][col]:
+    if not input_mode and fixed_grid[row][col]:
         message = "Cannot change a fixed cell!"
         message_color = RED
         return
@@ -160,6 +176,11 @@ def check_grid():
 # Solve the grid using the specified solver
 def solve_puzzle(solver_type='backtracking'):
     global grid, message, message_color
+    if any(1 in row for row in error_grid):
+        message = "Cannot solve. Please fix errors first."
+        message_color = RED
+        return
+
     if solver_type == 'backtracking':
         solved_grid, elapsed_time = backTrackingSolver(grid)
         if solved_grid:
@@ -170,6 +191,7 @@ def solve_puzzle(solver_type='backtracking'):
             message = "No solution exists!"
             message_color = RED
     else:
+        # Using DLX solver
         solver = SudokuSolver()
         result = solver.solve(grid)
         if result["found_solutions"]:
@@ -228,8 +250,20 @@ while running:
                 elif event.key in [pygame.K_BACKSPACE, pygame.K_DELETE, pygame.K_0]:
                     handle_input(row, col, 0)
 
-        # Debounced key presses for solving and resetting
-        if event.type == pygame.KEYDOWN:
+            # Toggle input mode
+            if event.key == pygame.K_RETURN:
+                if input_mode:
+                    # Set the fixed grid
+                    fixed_grid = [row[:] for row in grid]
+                    input_mode = False
+                    message = "Input mode disabled. You can now solve the puzzle."
+                    message_color = BLUE
+                else:
+                    input_mode = True
+                    message = "Input mode enabled. Modify the grid as needed."
+                    message_color = BLACK
+
+            # Debounced key presses for solving and resetting
             if event.key == pygame.K_r and not reset_triggered:
                 reset_grid()
                 reset_triggered = True
@@ -246,10 +280,9 @@ while running:
             if event.key in [pygame.K_b, pygame.K_d]:
                 solve_triggered = False
 
-    # Optional: Display real-time feedback or additional features here
-
     check_grid()
     pygame.display.update()
 
 pygame.quit()
+
 
