@@ -31,6 +31,7 @@ class DLX:
         self.column_map = {}
         self.solutions = []
         self.solution_stack = []
+        self.found_solution = False 
 
         # Initialize all constraint columns
         self.initialize_columns()
@@ -155,6 +156,7 @@ class DLX:
                 candidate = row_node.candidate
                 solution.append((candidate.digit, candidate.row, candidate.col))
             self.solutions.append(solution)
+            self.found_solution = True
             return
 
         # Choose the column with the fewest nodes
@@ -167,6 +169,8 @@ class DLX:
         current = column.down
         while current != column:
             self.solution_stack.append(current)
+            if self.found_solution:
+                return
 
             # Cover all columns in this row
             node = current.right
